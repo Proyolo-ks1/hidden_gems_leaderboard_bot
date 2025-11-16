@@ -175,7 +175,7 @@ def register_commands(
                 )
                 return
 
-            leaderboard_json = get_leaderboard_json()
+            leaderboard_json, _ = get_leaderboard_json()
             if "error" in leaderboard_json[0]:
                 await ctx.send(leaderboard_json[0]["error"])
                 return
