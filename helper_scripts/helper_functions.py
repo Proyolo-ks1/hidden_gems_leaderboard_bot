@@ -187,9 +187,16 @@ async def send_table_images(
         header += f"\n(Top {top_x})"
 
     await status_msg.edit(content=header)
-
+    counter = 0
     for path in image_paths:
-        await channel.send(file=discord.File(path))
+        if counter < 3:
+            await channel.send(file=discord.File(path))
+        elif counter == 3:
+            message = await channel.send(file=discord.File(path))
+            thread = await message.create_thread(name="Rest der Leaderboards")
+        else:
+            await thread.send(file=discord.File(path))
+        counter += 1
 
 
 # MARK: extract_leaderboard_meta()
