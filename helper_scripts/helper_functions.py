@@ -492,11 +492,11 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
         await channel.send("**Tracked Bots**")
         if force_text:
             await send_lines_chunked(
-                channel, status_msg, leaderboard_json_tracked, top_x, title
+                channel, status_msg, leaderboard_json_tracked, 9999, title
             )
         else:
             await send_table_images(
-                channel, status_msg, leaderboard_json_tracked, top_x, title
+                channel, status_msg, leaderboard_json_tracked, 9999, title
             )
 
 
