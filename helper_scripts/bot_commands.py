@@ -28,7 +28,7 @@ def register_commands(
     ):
         """Zeigt Leaderboard, optional Top x: "!leaderboard x (alias: lb, top)" """
 
-        if top_x.lower() == "help":
+        if top_x and top_x.lower() == "help":
             await ctx.send(
                 f"## Nutzung von `{ctx.prefix}leaderboard`"
                 f"\n-# (aliases: {ctx.prefix}lb, {ctx.prefix}top)"
@@ -58,9 +58,8 @@ def register_commands(
                     return
 
         # Decide if we force text mode
-        #you dont have to check mode if you already check lower
-        force_text = mode.lower() == "text"
-        if top_x.lower() == "text":
+        force_text = mode and mode.lower() == "text"
+        if top_x and top_x.lower() == "text":
             force_text = True
             top_x_int = None
 
