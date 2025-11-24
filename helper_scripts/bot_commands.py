@@ -8,7 +8,7 @@ from discord.ext import commands
 from discord import TextChannel
 
 # Own modules
-from helper_functions import get_tracked_bots, set_tracked_bots, get_leaderboard_json
+from helper_scripts.helper_functions import get_tracked_bots, set_tracked_bots, get_leaderboard_json
 
 
 def register_commands(

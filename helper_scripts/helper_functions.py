@@ -15,7 +15,7 @@ import datetime
 import requests
 
 # Own modules
-from asset_access import language_logos, get_lang_icon, get_twemoji_image
+from helper_scripts.asset_access import language_logos, get_lang_icon, get_twemoji_image
 
 
 BASE_DIR = Path(__file__).parent

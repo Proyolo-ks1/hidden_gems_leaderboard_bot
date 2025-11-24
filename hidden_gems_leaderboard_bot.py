@@ -15,8 +15,11 @@ import pytz
 from dotenv import load_dotenv
 
 # Own custom scripts / modules
-from bot_commands import register_commands
-from helper_functions import post_leaderboard_in_channels, send_leaderboard
+from helper_scripts.bot_commands import register_commands
+from helper_scripts.helper_functions import (
+    post_leaderboard_in_channels,
+    send_leaderboard,
+)
 
 BASE_DIR = Path(__file__).parent
 DATA_FILE = BASE_DIR / "bot_data.json"
