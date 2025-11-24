@@ -1,4 +1,4 @@
-# asset_access.py
+# helper_scripts/asset_access.py
 
 # Standard library imports
 import re
@@ -6,13 +6,12 @@ from enum import Enum
 from typing import Type
 from PIL import Image
 import os
-from pathlib import Path
 
 # Third-party imports
 from discord import PartialEmoji
 
 # Own custom scripts
-# None
+from helper_scripts.globals import BASE_DIR
 
 
 #       |==========================|
@@ -20,7 +19,6 @@ from discord import PartialEmoji
 #       |==========================|
 
 
-BASE_DIR = Path(__file__).parent
 IMAGE_DIR = BASE_DIR / "images"
 LANGUAGE_LOGOS_DIR = IMAGE_DIR / "languages"
 TWEMOJI_DIR = IMAGE_DIR / "twemoji"

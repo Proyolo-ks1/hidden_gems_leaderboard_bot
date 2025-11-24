@@ -1,14 +1,12 @@
-# helper_functions.py
+# helper_scripts/helper_functions.py
 
 # Standard library imports
 import os
 import json
-from pathlib import Path
 import math
 
 # Third-party imports
 import discord
-from discord import TextChannel
 from PIL import Image, ImageDraw, ImageFont
 from bs4 import BeautifulSoup
 import datetime
@@ -16,9 +14,10 @@ import requests
 
 # Own modules
 from helper_scripts.asset_access import language_logos, get_lang_icon, get_twemoji_image
+from helper_scripts.data_functions import load_bot_data
+from helper_scripts.globals import BASE_DIR
 
 
-BASE_DIR = Path(__file__).parent
 FONTS_DIR = BASE_DIR / "fonts"
 LOCAL_DATA = BASE_DIR / "local_data"
 OUTPUT_DIR = LOCAL_DATA / "generated_tables"
@@ -31,55 +30,43 @@ JSON_FILE = LOCAL_DATA / "leaderboard.json"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-def load_bot_data() -> dict:
-    if not BOT_DATA_PATH.exists():
-        return {}
-    with open(BOT_DATA_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_bot_data(data: dict):
-    with open(BOT_DATA_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def get_tracked_bots() -> dict:
-    data = load_bot_data()
-    return data.get("tracked_bots", {})
-
-
-def set_tracked_bots(tracked: dict):
-    data = load_bot_data()
-    data["tracked_bots"] = tracked
-    save_bot_data(data)
-
-
+# MARK: generate_images_from_json()
 def generate_images_from_json(
     leaderboard_json: list[dict], top_x: int | None = None
 ) -> list[str]:
     """Generate one or more PNG images from the leaderboard JSON."""
+
+    # ----- COLORS -----
+    BACKGROUND_COLOR = (21, 21, 20)  # original was (25,25,25)
+    HEADER_COLOR = (255, 200, 0)  # header text
+    NORMAL_TEXT_COLOR = (231, 230, 225)  # normal rank text
+    DNQ_TEXT_COLOR = (108, 107, 105)  # text for "DNQ." ranks
+    PADDING = 5
+    LINE_HEIGHT = 36
+    MAX_ROWS_PER_IMAGE = 20
+
     text_font = ImageFont.truetype(TEXT_FONT_PATH, 18)
-    line_height = 36
-    padding = 5
-    max_rows_per_image = 20
+
+    # slice top_x rows if provided
     rows = leaderboard_json[:top_x] if top_x else leaderboard_json
     total_rows = len(rows)
 
-    num_images = math.ceil(total_rows / max_rows_per_image)
+    num_images = math.ceil(total_rows / MAX_ROWS_PER_IMAGE)
     rows_per_image = math.ceil(total_rows / num_images)
 
     images = []
+
     for i in range(num_images):
         start_idx = i * rows_per_image
         end_idx = min(start_idx + rows_per_image, total_rows)
         chunk = rows[start_idx:end_idx]
 
         img_width = 1140
-        img_height = padding * 2 + (len(chunk) + 1) * line_height
-        img = Image.new("RGB", (img_width, img_height), color=(25, 25, 25))
+        img_height = PADDING * 2 + (len(chunk) + 1) * LINE_HEIGHT
+        img = Image.new("RGB", (img_width, img_height), color=BACKGROUND_COLOR)
         draw = ImageDraw.Draw(img)
 
-        # header
+        # ----- HEADER -----
         columns = [
             ("#", 60),
             ("Rang", 60),
@@ -93,25 +80,25 @@ def generate_images_from_json(
             ("Ort", 150),
             ("Lang", 60),
         ]
-
-        # Extract headers and widths
         header_titles, col_widths = zip(*columns)
-
-        # Calculate col_x positions automatically
-        col_x = [5]  # first column starts at x=5
+        col_x = [5]
         for w in col_widths[:-1]:
             col_x.append(col_x[-1] + w)
 
-        # Headers
         for col_idx, head in enumerate(header_titles):
             if col_idx != 2:  # not emoji column
                 draw.text(
-                    (col_x[col_idx], padding), head, fill=(255, 200, 0), font=text_font
+                    (col_x[col_idx], PADDING), head, fill=HEADER_COLOR, font=text_font
                 )
 
-        # Rows
-        y = padding + line_height
+        # ----- ROWS -----
+        y = PADDING + LINE_HEIGHT
         for row_idx, entry in enumerate(chunk, start=start_idx + 1):
+            first_cell = entry.get("Rang")  # can use to check DNQ
+
+            # determine text color based on rank
+            text_color = DNQ_TEXT_COLOR if first_cell == "DNQ." else NORMAL_TEXT_COLOR
+
             rank = entry.get("Rang", "")
             emoji_str = entry.get("Col1", "")
             bot = entry.get("Bot", "")
@@ -151,7 +138,7 @@ def generate_images_from_json(
                     draw.text(
                         (col_x[col_idx], y),
                         val_to_draw,
-                        fill=(255, 255, 255),
+                        fill=text_color,
                         font=text_font,
                     )
 
@@ -159,7 +146,7 @@ def generate_images_from_json(
             lang_img = get_lang_icon(sprache)
             img.paste(lang_img, (col_x[-1], y - 8), lang_img.convert("RGBA"))
 
-            y += line_height
+            y += LINE_HEIGHT
 
         file_path = os.path.join(OUTPUT_DIR, f"leaderboard_part_{i + 1}.png")
         img.save(file_path)
@@ -168,6 +155,7 @@ def generate_images_from_json(
     return images
 
 
+# MARK: fit_text_to_column()
 def fit_text_to_column(draw, text, font, max_width):
     """Truncate text and add ellipsis if it doesn't fit the column width."""
     if draw.textlength(text, font=font) <= max_width:
@@ -177,6 +165,7 @@ def fit_text_to_column(draw, text, font, max_width):
     return text + "..." if text else ""
 
 
+# MARK: send_table_images()
 async def send_table_images(
     channel, status_msg, leaderboard_json, top_x, title: str | None = None
 ):
@@ -199,6 +188,7 @@ async def send_table_images(
         await channel.send(file=discord.File(path))
 
 
+# MARK: get_leaderboard_date()
 def get_leaderboard_date(html: str) -> datetime.date | None:
     soup = BeautifulSoup(html, "html.parser")
     boxes = soup.find_all("div", class_="box")
@@ -218,6 +208,7 @@ def get_leaderboard_date(html: str) -> datetime.date | None:
     return None
 
 
+# MARK: parse_html_to_json()
 def parse_html_to_json(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table")
@@ -298,6 +289,7 @@ def parse_html_to_json(html: str) -> list[dict]:
     return leaderboard_json
 
 
+# MARK: json_to_text_table()
 def json_to_text_table(leaderboard_json: list[dict]) -> list[str]:
     """Return the leaderboard as a list of formatted lines instead of a single string, with index column."""
     if not leaderboard_json:
@@ -346,6 +338,7 @@ def json_to_text_table(leaderboard_json: list[dict]) -> list[str]:
     return lines
 
 
+# MARK: get_leaderboard_json()
 def get_leaderboard_json() -> tuple[list[dict], datetime.date | None]:
     url = "https://hiddengems.gymnasiumsteglitz.de/scrims"
     try:
@@ -364,6 +357,7 @@ def get_leaderboard_json() -> tuple[list[dict], datetime.date | None]:
     return leaderboard_json, leaderboard_date
 
 
+# MARK: send_lines_chunked()
 async def send_lines_chunked(
     channel, status_msg, leaderboard_json, top_x, title: str | None = None
 ):
@@ -395,23 +389,30 @@ async def send_lines_chunked(
         await channel.send(chunk)
 
 
-def filter_json_tracked(leaderboard_json: list[dict]) -> list[dict]:
-    tracked = get_tracked_bots()
-    if not tracked:
+# MARK: filter_json_tracked()
+def filter_json_tracked(
+    leaderboard_json: list[dict], tracked_bots: list[dict]
+) -> list[dict]:
+    if not tracked_bots:
         return []
 
     filtered = [
         entry
         for entry in leaderboard_json
-        for bot_info in tracked.values()
+        for bot_info in tracked_bots  # just iterate the list
         if entry.get("Bot") == bot_info["name"]
         and entry.get("Autor / Team") == bot_info["author"]
     ]
     return filtered
 
 
-async def send_leaderboard(channel, top_x, force_text):
+# MARK: send_leaderboard()
+async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
     status_msg = await channel.send("Fetching leaderboards...")
+
+    if as_thread:
+        # TODO: implement thread posting
+        pass
 
     leaderboard_json, leaderboard_date = get_leaderboard_json()
 
@@ -427,7 +428,7 @@ async def send_leaderboard(channel, top_x, force_text):
         await send_table_images(channel, status_msg, leaderboard_json, top_x, title)
 
     # Tracked bots
-    leaderboard_json_tracked = filter_json_tracked(leaderboard_json)
+    leaderboard_json_tracked = filter_json_tracked(leaderboard_json, tracked_bots)
     if leaderboard_json_tracked:
         await channel.send("**Tracked Bots**")
         if force_text:
@@ -440,15 +441,35 @@ async def send_leaderboard(channel, top_x, force_text):
             )
 
 
-async def post_leaderboard_in_channels(bot, channels_to_post):
-    if not channels_to_post:
-        print("Keine Channels zum Posten registriert.")
+# MARK: post_lb_in_scheduled_channels()
+async def post_lb_in_scheduled_channels(bot):
+    data = load_bot_data()
+    guilds = data.get("guild_data", {})
+
+    if not guilds:
+        print("Keine Guild-Daten gefunden.")
         return
 
-    for channel_id in list(channels_to_post):
-        channel = bot.get_channel(channel_id)
-        if not isinstance(channel, TextChannel):
-            print(f"Channel {channel_id} ist kein TextChannel oder nicht gefunden.")
+    # Loop through all guilds/DMs
+    for guild_id, g_data in guilds.items():
+        scheduled_channels = g_data.get("scheduled_channels", [])
+        tracked_bots = g_data.get("tracked_bots", [])
+
+        if not scheduled_channels:
             continue
 
-        await send_leaderboard(channel, None, False)
+        for channel_id in scheduled_channels:
+            channel = bot.get_channel(int(channel_id))
+
+            if channel is None:
+                print(f"Channel {channel_id} nicht gefunden.")
+                continue
+
+            # DM or guild both fine (TextChannel, Thread, DMChannel)
+            await send_leaderboard(
+                channel,
+                tracked_bots=tracked_bots,
+                top_x=None,
+                force_text=False,
+                as_thread=True,
+            )

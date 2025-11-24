@@ -1,14 +1,16 @@
-# bot_commands.py
+# helper_scripts/bot_commands.py
 
 # Standard library imports
-from typing import Optional
+from typing import Optional, List, Dict
 
 # Third-party imports
+import discord
 from discord.ext import commands
 from discord import TextChannel
 
 # Own modules
-from helper_scripts.helper_functions import get_tracked_bots, set_tracked_bots, get_leaderboard_json
+from helper_scripts.helper_functions import get_leaderboard_json
+from helper_scripts.data_functions import get_tracked_bots, set_tracked_bots
 
 
 def register_commands(
@@ -19,16 +21,28 @@ def register_commands(
     save_channels,
     send_leaderboard,
 ):
+    # MARK: !leaderboard / top
     @bot.command(name="leaderboard", aliases=["lb", "top"])
     async def leaderboard_command(
         ctx: commands.Context, top_x: Optional[str] = None, mode: Optional[str] = None
     ):
-        """Zeigt Leaderboard, optional Top x: "!leaderboard x (alias: lb, top)"""
-        if not isinstance(ctx.channel, TextChannel):
+        """Zeigt Leaderboard, optional Top x: "!leaderboard x (alias: lb, top)" """
+
+        if top_x and top_x.lower() == "help":
             await ctx.send(
-                "❌ Dieser Befehl kann nur in Servertextkanälen verwendet werden."
+                f"## Nutzung von `{ctx.prefix}leaderboard`"
+                f"\n-# (aliases: {ctx.prefix}lb, {ctx.prefix}top)"
+                "\n"
+                "\n`!top [top_x] [force_text] [no_tracked]`"
+                "\n- `[top_x]       ` → zeige nur die top [top_x] Einträge des Leaderboards"
+                '\n- `["text"]      ` → erzwingt Textformat statt Bilder'
+                '\n- `["no_tracked"]` → sendet keine tracked Bots'
+                "\n-# ℹ️ Syntax: `<param>` = erforderlicher parameter, `[param]` = optionaler parameter"
             )
             return
+
+        # Determine guild ID (or use author ID for DM)
+        guild_id = ctx.guild.id if ctx.guild else ctx.author.id
 
         # Convert top_x to int if provided
         top_x_int = None
@@ -38,13 +52,28 @@ def register_commands(
                 if top_x_int <= 0:
                     top_x_int = None
             except ValueError:
-                await ctx.send("❌ Ungültige Zahl. Bitte gib eine ganze Zahl ein.")
-                return
+                # ignore if top_x is "text" or other mode
+                if top_x.lower() != "text":
+                    await ctx.send("❌ Ungültige Zahl. Bitte gib eine ganze Zahl ein.")
+                    return
 
         # Decide if we force text mode
         force_text = mode and mode.lower() == "text"
+        if top_x and top_x.lower() == "text":
+            force_text = True
+            top_x_int = None
 
-        await send_leaderboard(ctx.channel, top_x_int, force_text=force_text)
+        # Get tracked bots for this guild/DM
+        tracked_bots = get_tracked_bots(guild_id=guild_id)
+
+        # Call the updated send_leaderboard
+        await send_leaderboard(
+            channel=ctx.channel,
+            tracked_bots=tracked_bots,
+            top_x=top_x_int,
+            force_text=force_text,
+            as_thread=False,  # or True if you implement thread posting
+        )
 
     # MARK: !schedule
     @bot.command(name="schedule", aliases=["s"])
@@ -55,11 +84,13 @@ def register_commands(
         # Wenn keine Aktion angegeben oder ungültig
         if not action or action.lower() not in valid_actions:
             await ctx.send(
-                f"ℹNutzung von `{ctx.prefix}schedule`:"
+                f"## Nutzung von `{ctx.prefix}schedule`"
+                f"\n-# (aliases: {ctx.prefix}s)"
+                "\n"
                 "\n- `start` → Scheduler für diesen Channel aktivieren"
                 "\n- `stop ` → Scheduler für diesen Channel deaktivieren"
                 "\n- `list ` → Zeigt alle registrierten Channels (Admins only)"
-                "\n⚠️ Syntax: `<required parameter>` = erforderlich, `[optional parameter]` = optional"
+                "\n-# ℹ️ Syntax: `<param>` = erforderlicher parameter, `[param]` = optionaler parameter"
             )
             return
 
@@ -155,18 +186,39 @@ def register_commands(
         arg: Optional[str] = None,
     ):
         """Manage tracked bots: list/add/remove"""
-        tracked = get_tracked_bots()
+        guild_id = ctx.guild.id if ctx.guild else ctx.author.id
+        tracked_bots: List[Dict] = get_tracked_bots(guild_id=guild_id)
+
+        # Determine if this is a DM or a server
+        location_type = (
+            f"DM: {ctx.author.name}"
+            if ctx.guild is None
+            else f"Server: {ctx.guild.name}"
+        )
+        embed_color = 0xB1CCDB
 
         if action == "list":
-            if not tracked:
-                await ctx.send("📭 Keine Bots werden aktuell getrackt.")
+            if not tracked_bots:
+                embed = discord.Embed(
+                    title=f"Tracked Bots in {location_type}",
+                    description="📭 Keine Bots werden aktuell getrackt.",
+                    color=embed_color,
+                )
+                await ctx.send(embed=embed)
                 return
 
-            lines = [
-                f"{idx}. {info['emoji']} {info['name']} (Autor: {info['author']})"
-                for idx, (bot_id, info) in enumerate(tracked.items(), start=1)
-            ]
-            await ctx.send("\n".join(lines))
+            embed = discord.Embed(
+                title=f"Tracked Bots in {location_type}", color=embed_color
+            )
+
+            for idx, info in enumerate(tracked_bots, start=1):
+                embed.add_field(
+                    name=f"{idx}. {info['emoji']} {info['name']}",
+                    value=f"Autor: {info['author']}",
+                    inline=False,
+                )
+
+            await ctx.send(embed=embed)
 
         elif action == "add":
             if not arg:
@@ -205,16 +257,27 @@ def register_commands(
 
             # Single match: add to tracked
             bot_info = matching_bots[0]
-            new_id = str(max([int(k) for k in tracked.keys()] + [1000000]) + 1)
-            tracked[new_id] = {
-                "name": bot_info.get("Bot"),
-                "emoji": bot_info.get("Col1", ""),
-                "author": bot_info.get("Autor / Team", ""),
-            }
-            set_tracked_bots(tracked)
-            await ctx.send(
-                f"✅ Bot `{bot_info.get('Bot')}` wurde zur Tracking-Liste hinzugefügt."
+
+            # Append to the list
+            tracked_bots.append(
+                {
+                    "name": bot_info.get("Bot"),
+                    "emoji": bot_info.get("Col1", ""),
+                    "author": bot_info.get("Autor / Team", ""),
+                }
             )
+
+            # Save updated list
+            set_tracked_bots(guild_id=guild_id, tracked=tracked_bots)
+
+            # Green confirmation embed
+            embed = discord.Embed(
+                title="✅ Bot erfolgreich getrackt!",
+                description=f"`{bot_info.get('Bot')}` wurde zur Tracking-Liste hinzugefügt.",
+                color=0x00FF00,
+            )
+            await ctx.send(embed=embed)
+            return
 
         elif action == "remove":
             if not arg:
@@ -225,23 +288,32 @@ def register_commands(
 
             try:
                 index = int(arg) - 1
-                bot_ids = list(tracked.keys())
-                if index < 0 or index >= len(bot_ids):
+                if index < 0 or index >= len(tracked_bots):
                     await ctx.send("Ungültiger Index.")
                     return
-                removed_id = bot_ids[index]
-                removed_bot = tracked.pop(removed_id)
-                set_tracked_bots(tracked)
-                await ctx.send(f"🗑️ Bot `{removed_bot['name']}` wurde entfernt.")
+
+                removed_bot = tracked_bots.pop(index)
+                set_tracked_bots(guild_id=guild_id, tracked=tracked_bots)
+
+                # Red confirmation embed
+                embed = discord.Embed(
+                    title="🗑️ Bot entfernt",
+                    description=f"`{removed_bot['name']}` wurde aus der Tracking-Liste entfernt.",
+                    color=0x00FF00,
+                )
+                await ctx.send(embed=embed)
+
             except ValueError:
                 await ctx.send("Ungültige Eingabe. Bitte gib eine Zahl an.")
 
         else:
             await ctx.send(
-                f"ℹNutzung von `{ctx.prefix}track`:"
-                "\n- `add <Botname>      ` → fügt Bot zu zum tracking"
-                "\n- `remove <list index>` → entfernt bot vom tracking"
+                f"## Nutzung von `{ctx.prefix}track`"
+                f"\n-# (aliases: {ctx.prefix}t)"
+                "\n"
+                "\n- `add <Botname>      ` → fügt Bot zu zum tracking mit namen `<Botname>`"
+                "\n- `remove <list index>` → entfernt bot vom tracking mit index `<list index>`"
                 "\n- `list               ` → Zeigt alle tracked Bots"
-                "\n⚠️ Syntax: `<required parameter>` = erforderlich, `[optional parameter]` = optional"
+                "\n-# ℹ️ Syntax: `<param>` = erforderlicher parameter, `[param]` = optionaler parameter"
             )
             return

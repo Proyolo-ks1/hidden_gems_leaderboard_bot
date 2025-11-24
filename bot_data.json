@@ -1,23 +1,31 @@
 {
   "scheduled_channels": {
-    "1382608864976961556": "Discord Bot Testing Server#🤖bot-demo-channel",
     "1285294053788880907": "Discord Bot Testing Server#🤖bot-testing-channel"
   },
-  "tracked_bots": {
-    "1000002": {
-      "name": "Two Piece",
-      "emoji": "👒",
-      "author": "Gear Six"
+  "guild_data": {
+    "1229551126022590504": {
+      "tracked_bots": [],
+      "scheduled_channels": []
     },
-    "1000004": {
-      "name": "Traveling Bot",
-      "emoji": "🤖",
-      "author": "BotOnAJourney"
-    },
-    "1000005": {
-      "name": "JS-Raccoon",
-      "emoji": "🦝",
-      "author": "KonniBot"
+    "485374713896370176": {
+      "tracked_bots": [
+        {
+          "name": "Drop B",
+          "emoji": "🤘",
+          "author": "Donnemann"
+        },
+        {
+          "name": "fixxbot",
+          "emoji": "👾",
+          "author": "fixx"
+        },
+        {
+          "name": "CrocoBot",
+          "emoji": "🐊",
+          "author": "Fedi41"
+        }
+      ],
+      "scheduled_channels": []
     }
   }
 }

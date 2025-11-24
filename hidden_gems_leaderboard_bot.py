@@ -17,11 +17,12 @@ from dotenv import load_dotenv
 # Own custom scripts / modules
 from helper_scripts.bot_commands import register_commands
 from helper_scripts.helper_functions import (
-    post_leaderboard_in_channels,
+    post_lb_in_scheduled_channels,
     send_leaderboard,
 )
+from helper_scripts.globals import BASE_DIR, DOTENV_PATH
 
-BASE_DIR = Path(__file__).parent
+
 DATA_FILE = BASE_DIR / "bot_data.json"
 LOCAL_DATA = BASE_DIR / "local_data"
 IMAGES_DIR = BASE_DIR / "images"
@@ -54,8 +55,8 @@ def main():
             )
 
     # Load Environment Variables
-    dotenv_path = Path("..") / "environment_variables.env"
-    load_dotenv(dotenv_path=dotenv_path)
+
+    load_dotenv(dotenv_path=DOTENV_PATH)
     DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
     if DISCORD_BOT_TOKEN is None:
         raise ValueError("DISCORD_BOT_TOKEN ist nicht in der .env gesetzt!")
@@ -85,9 +86,9 @@ def main():
         # Scheduler starten
         if not scheduler.get_jobs():
             job = scheduler.add_job(
-                post_leaderboard_in_channels,
+                post_lb_in_scheduled_channels,
                 CronTrigger(hour=1, minute=00),
-                args=[bot, channels_to_post],
+                args=[bot],
             )
             scheduler.start()
 
