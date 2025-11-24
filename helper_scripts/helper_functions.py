@@ -36,7 +36,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # MARK: generate_images_from_json()
 def generate_images_from_json(
-    leaderboard_json: list[dict], top_x: int | None = None
+    leaderboard_json: list[dict], top_x=-1 | None = None
 ) -> list[str]:
     """Generate one or more PNG images from the leaderboard JSON."""
 
@@ -52,7 +52,7 @@ def generate_images_from_json(
     text_font = ImageFont.truetype(TEXT_FONT_PATH, 18)
 
     # slice top_x rows if provided
-    rows = leaderboard_json[:top_x] if top_x else leaderboard_json
+    rows = leaderboard_json[:top_x] if top_x >= 0 else leaderboard_json
     total_rows = len(rows)
 
     num_images = math.ceil(total_rows / MAX_ROWS_PER_IMAGE)
@@ -171,12 +171,13 @@ def fit_text_to_column(draw, text, font, max_width):
 
 # MARK: send_table_images()
 async def send_table_images(
-    channel, status_msg, leaderboard_json, top_x, title: str | None = None
+    channel, status_msg, leaderboard_json, top_x=-1, title: str | None = None
 ):
     await status_msg.edit(content="📊 Generating leaderboard images...")
-
-    image_paths = generate_images_from_json(leaderboard_json, top_x)
-
+    if top_x >= 0:
+        image_paths = generate_images_from_json(leaderboard_json, top_x)
+    else:
+        image_paths = generate_images_from_json(leaderboard_json)
     # Build title message
     if title:
         header = title
@@ -401,12 +402,12 @@ def get_leaderboard_json() -> tuple[list[dict], dict[str, Any]]:
 
 # MARK: send_lines_chunked()
 async def send_lines_chunked(
-    channel, status_msg, leaderboard_json, top_x, title: str | None = None
+    channel, status_msg, leaderboard_json, top_x=-1, title: str | None = None
 ):
     lines = json_to_text_table(leaderboard_json)
 
     # Slice lines if top_x is set (keep header + spacer lines)
-    if top_x:
+    if top_x >= 0:
         lines = lines[: top_x + 2]  # +2 to include header + spacer
 
     # Build title message
@@ -492,11 +493,11 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
         await channel.send("**Tracked Bots**")
         if force_text:
             await send_lines_chunked(
-                channel, status_msg, leaderboard_json_tracked, 9999, title
+                channel, status_msg, leaderboard_json_tracked, title
             )
         else:
             await send_table_images(
-                channel, status_msg, leaderboard_json_tracked, 9999, title
+                channel, status_msg, leaderboard_json_tracked, title
             )
 
 
