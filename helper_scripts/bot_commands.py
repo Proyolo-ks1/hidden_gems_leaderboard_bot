@@ -7,10 +7,12 @@ from typing import Optional, List, Dict
 import discord
 from discord.ext import commands
 from discord import TextChannel
+from discord import Embed
 
 # Own modules
 from helper_scripts.helper_functions import get_leaderboard_json
 from helper_scripts.data_functions import get_tracked_bots, set_tracked_bots
+from helper_scripts.asset_access import send_embed_all_emojis
 
 
 def register_commands(
@@ -159,17 +161,6 @@ def register_commands(
                 "❌ Ungültiger Parameter. Nutze `start`, `stop` oder `list`."
             )
 
-    # MARK: !stopbot
-    @bot.command(name="stopbot", aliases=["stop"])
-    async def stop_bot_command(ctx: commands.Context):
-        """Stoppt den Bot (Admins only)"""
-        if ctx.author.id not in ADMINS:
-            await ctx.send("🚫 Du hast keine Berechtigung, diesen Befehl zu nutzen.")
-            return
-
-        await ctx.send("⏹️ Bot wird heruntergefahren...")
-        await bot.close()
-
     # MARK: !ping
     @bot.command(name="ping", aliases=["p"])
     async def ping_command(ctx: commands.Context):
@@ -200,7 +191,7 @@ def register_commands(
         # MARK: > list
         if action == "list":
             if not tracked_bots:
-                embed = discord.Embed(
+                embed = Embed(
                     title=f"Tracked Bots in {location_type}",
                     description="📭 Keine Bots werden aktuell getrackt.",
                     color=embed_color,
@@ -208,9 +199,7 @@ def register_commands(
                 await ctx.send(embed=embed)
                 return
 
-            embed = discord.Embed(
-                title=f"Tracked Bots in {location_type}", color=embed_color
-            )
+            embed = Embed(title=f"Tracked Bots in {location_type}", color=embed_color)
 
             for idx, info in enumerate(tracked_bots, start=1):
                 embed.add_field(
@@ -297,7 +286,7 @@ def register_commands(
 
             set_tracked_bots(guild_id=guild_id, tracked=tracked_bots)
 
-            embed = discord.Embed(title="Bots zum Tracken Hinzufügen", color=0x00FF00)
+            embed = Embed(title="Bots zum Tracken Hinzufügen", color=0x00FF00)
 
             # Field 1: Successfully added bots
             if added_bots:
@@ -412,7 +401,7 @@ def register_commands(
             set_tracked_bots(guild_id=guild_id, tracked=tracked_bots)
 
             # Build embed
-            embed = discord.Embed(title="Bots zum Tracken entfernen", color=0xFF0000)
+            embed = Embed(title="Bots zum Tracken entfernen", color=0xFF0000)
 
             if removed_info:
                 for idx, bot_info in removed_info:
@@ -446,3 +435,43 @@ def register_commands(
                 "\n-# ℹ️ Syntax: `<param>` = erforderlicher parameter, `[param]` = optionaler parameter"
             )
             return
+
+    # MARK: !bot
+    @bot.command(name="bot")
+    async def bot_command(ctx: commands.Context, subcommand: Optional[str] = None):
+        """
+        Verwalte Bot-spezifische Aktionen
+        """
+        if subcommand is None:
+            # Hilfe ausgeben, wenn kein Unterbefehl angegeben
+            await ctx.send(
+                f"## Nutzung von `{ctx.prefix}bot`"
+                "\n- `emojitest` → sendet alle Emojis zum Testen"
+                "\n- `stop`      → fährt den Bot herunter (Admins only)"
+                "\n-# ℹ️ Syntax: `<param>` = erforderlicher Parameter, `[param]` = optionaler Parameter"
+            )
+            return
+
+        subcommand = (
+            subcommand.lower()
+        )  # das sollte ich vielleicht auch an anderen stellen machen...
+
+        if subcommand == "emojitest":
+            await send_embed_all_emojis(ctx)
+
+        elif subcommand == "stop":
+            if ctx.author.id not in ADMINS:
+                await ctx.send(
+                    "🚫 Du hast keine Berechtigung, diesen Befehl zu nutzen."
+                )
+                return
+
+            await ctx.send("⏹️ Bot wird heruntergefahren...")
+            await bot.close()
+
+        else:
+            # Fallback-Hilfe für unbekannte Unterbefehle
+            await ctx.send(
+                f"Unbekannter Unterbefehl `{subcommand}`.\n"
+                f"Verfügbare Unterbefehle: `emojitest`, `stop`"
+            )

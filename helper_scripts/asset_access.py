@@ -8,7 +8,7 @@ from PIL import Image
 import os
 
 # Third-party imports
-from discord import PartialEmoji
+from discord import Embed, PartialEmoji
 
 # Own custom scripts
 from helper_scripts.globals import BASE_DIR
@@ -149,3 +149,16 @@ def get_twemoji_image(emoji: str, size: int = 32) -> Image.Image:
     if size != img.width:
         img = img.resize((size, size), Image.Resampling.LANCZOS)
     return img
+
+
+async def send_embed_all_emojis(ctx):
+    """
+    Returns a single string that contains all plain-string language emojis.
+    Useful for quickly verifying whether all emojis render correctly.
+    """
+    embed = Embed(title="🛠️ Test aller Emojis", color=0x00FF00)
+    for lang, emoji in language_logos.items():
+        # name = Sprache, value = Emoji selbst
+        embed.add_field(name=lang.capitalize(), value=emoji, inline=True)
+
+    await ctx.send(embed=embed)
