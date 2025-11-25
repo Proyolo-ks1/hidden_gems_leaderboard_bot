@@ -39,20 +39,20 @@ def generate_images_from_json(
     """Generate one or more PNG images from the leaderboard JSON."""
 
     # ----- COLORS -----
-    BACKGROUND_COLOR = (21, 21, 20)  # original was (25,25,25)
-    HEADER_COLOR = (255, 200, 0)  # header text
-    NORMAL_TEXT_COLOR = (231, 230, 225)  # normal rank text
-    DNQ_TEXT_COLOR = (108, 107, 105)  # text for "DNQ." ranks
+    BACKGROUND_COLOR = (21, 21, 20)
+    HEADER_COLOR = (255, 200, 0)
+    NORMAL_TEXT_COLOR = (231, 230, 225)
+    DNQ_TEXT_COLOR = (108, 107, 105)
+
+    # ----- LAYOUT -----
     PADDING = 5
     LINE_HEIGHT = 36
     MAX_ROWS_PER_IMAGE = 20
-
-    text_font = ImageFont.truetype(TEXT_FONT_PATH, 18)
+    TEXT_FONT = ImageFont.truetype(TEXT_FONT_PATH, 18)
 
     # slice top_x rows if provided
     rows = leaderboard_json[:top_x] if top_x else leaderboard_json
     total_rows = len(rows)
-
     num_images = math.ceil(total_rows / MAX_ROWS_PER_IMAGE)
     rows_per_image = math.ceil(total_rows / num_images)
 
@@ -90,7 +90,7 @@ def generate_images_from_json(
         for col_idx, head in enumerate(header_titles):
             if col_idx != 2:  # not emoji column
                 draw.text(
-                    (col_x[col_idx], PADDING), head, fill=HEADER_COLOR, font=text_font
+                    (col_x[col_idx], PADDING), head, fill=HEADER_COLOR, font=TEXT_FONT
                 )
 
         # ----- ROWS -----
@@ -135,13 +135,13 @@ def generate_images_from_json(
                         else 120
                     )
                     val_to_draw = fit_text_to_column(
-                        draw, str(val), text_font, col_width
+                        draw, str(val), TEXT_FONT, col_width
                     )
                     draw.text(
                         (col_x[col_idx], y),
                         val_to_draw,
                         fill=text_color,
-                        font=text_font,
+                        font=TEXT_FONT,
                     )
 
             # language icon
@@ -175,26 +175,35 @@ async def send_table_images(
 
     image_paths = generate_images_from_json(leaderboard_json, top_x)
 
-    # Build title message
-    header = ""
-    if title:
-        header += title
-
+    # Build header message
+    header = title or "**Aktuelles Leaderboard**"
     if top_x and top_x > 0:
         header += f"\n**(Top {top_x})**"
-
     await status_msg.edit(content=header)
 
-    counter = 0
-    for path in image_paths:
-        if counter < 3:
+    MAX_IMAGES_BEFORE_THREAD = 1  # first N images also go in main channel
+
+    thread: Optional[discord.Thread] = None
+    thread_created = False
+
+    # Only use thread if more than 1 image
+    use_thread = len(image_paths) > 1
+
+    # Determine thread title: first line of title
+    thread_title = title.split("\n")[0] if title else "Rest der Leaderboards"
+
+    for i, path in enumerate(image_paths):
+        # If more than 1 image, send all images into thread as well
+        if use_thread:
+            if not thread_created:
+                thread = await status_msg.create_thread(name=thread_title)
+                thread_created = True
+            if thread:
+                await thread.send(file=discord.File(path))
+
+        # Always send first MAX_IMAGES_BEFORE_THREAD images in main channel
+        if i < MAX_IMAGES_BEFORE_THREAD:
             await channel.send(file=discord.File(path))
-        elif counter == 3:
-            message = await channel.send(file=discord.File(path))
-            thread = await message.create_thread(name="Rest der Leaderboards")
-        else:
-            await thread.send(file=discord.File(path))
-        counter += 1
 
 
 # MARK: extract_leaderboard_meta()
