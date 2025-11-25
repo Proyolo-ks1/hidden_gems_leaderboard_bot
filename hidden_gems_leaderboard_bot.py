@@ -98,6 +98,17 @@ def main():
                 next_run = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S %Z")
                 print(f"Scheduler bereits aktiv. Nächster Lauf: {next_run}")
 
+    # ----------------- Command Logging -----------------
+    @bot.event
+    async def on_command(ctx: commands.Context):
+        print(
+            f"[COMMAND] {ctx.author} hat '{ctx.command}' in {ctx.channel} ausgeführt."
+        )
+
+    @bot.event
+    async def on_command_error(ctx, error):
+        print(f"[ERROR] Command '{ctx.command}' von {ctx.author} schlug fehl: {error}")
+
     register_commands(
         bot,
         ADMINS,
