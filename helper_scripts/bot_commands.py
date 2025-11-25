@@ -466,6 +466,9 @@ def register_commands(
                 )
                 return
 
+            print(
+                f"[BOT STOP] {ctx.author} ({ctx.author.id}) hat den Bot heruntergefahren."
+            )
             await ctx.send("⏹️ Bot wird heruntergefahren...")
             await bot.close()
 
