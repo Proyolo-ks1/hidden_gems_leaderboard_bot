@@ -406,7 +406,7 @@ async def send_lines_chunked(
     else:
         header = "**Aktuelles Leaderboard**"
 
-    if top_x:
+    if top_x and top_x > 0:
         header += f"\n(Top {top_x})"
 
     await status_msg.edit(content=header)
@@ -449,23 +449,25 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
 
     leaderboard_json, leaderboard_meta = get_leaderboard_json()
 
+    # Leaderboard
+
     # Format the title using metadata (date, seed, stage)
     if leaderboard_meta:
-        # DATE
+        # Date
         date_str = (
             leaderboard_meta["date"].strftime("%d. %B %Y")
             if leaderboard_meta.get("date")
             else "Unbekanntes Datum"
         )
 
-        # STAGE
+        # Stage
         stage_str = (
             f"{leaderboard_meta['stage']}"
             if leaderboard_meta.get("stage") is not None
             else ""
         )
 
-        # SEED
+        # Seed
         seed_str = f"{leaderboard_meta['seed']}" if leaderboard_meta.get("seed") else ""
 
         title = f"## Leaderboard vom {date_str}\n-# {stage_str}\n-# {seed_str}"
@@ -478,16 +480,17 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
         await send_table_images(channel, status_msg, leaderboard_json, top_x, title)
 
     # Tracked bots
+    status_msg = await channel.send(f"*⌛Extracting data of tracked Bots...*")
+    title = "**Tracked Bots**"
     leaderboard_json_tracked = filter_json_tracked(leaderboard_json, tracked_bots)
     if leaderboard_json_tracked and len(leaderboard_json_tracked) > 0:
-        await channel.send("**Tracked Bots**")
         if force_text:
             await send_lines_chunked(
-                channel, status_msg, leaderboard_json_tracked, 9999, title
+                channel, status_msg, leaderboard_json_tracked, 0, title
             )
         else:
             await send_table_images(
-                channel, status_msg, leaderboard_json_tracked, 9999, title
+                channel, status_msg, leaderboard_json_tracked, 0, title
             )
 
 
@@ -519,7 +522,7 @@ async def post_lb_in_scheduled_channels(bot):
             await send_leaderboard(
                 channel,
                 tracked_bots=tracked_bots,
-                top_x=None,
+                top_x=0,
                 force_text=False,
                 as_thread=True,
             )

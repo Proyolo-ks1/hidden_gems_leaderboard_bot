@@ -44,13 +44,13 @@ def register_commands(
         # Determine guild ID (or use author ID for DM)
         guild_id = ctx.guild.id if ctx.guild else ctx.author.id
 
-        # Convert top_x to int if provided
-        top_x_int = None
+        # top filter
+        top_x_int = 0  # default 0 (all)
         if top_x:
             try:
                 top_x_int = int(top_x)
-                if top_x_int <= 0:
-                    top_x_int = None
+                if top_x_int < 0:
+                    top_x_int = 0
             except ValueError:
                 # ignore if top_x is "text" or other mode
                 if top_x.lower() != "text":
