@@ -501,18 +501,19 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
         await send_table_images(channel, status_msg, leaderboard_json, top_x, title)
 
     # Tracked bots
-    status_msg = await channel.send(f"*⌛Extracting data of tracked Bots...*")
-    title = "**Tracked Bots**"
-    leaderboard_json_tracked = filter_json_tracked(leaderboard_json, tracked_bots)
-    if leaderboard_json_tracked and len(leaderboard_json_tracked) > 0:
-        if force_text:
-            await send_table_texts(
-                channel, status_msg, leaderboard_json_tracked, 0, title
-            )
-        else:
-            await send_table_images(
-                channel, status_msg, leaderboard_json_tracked, 0, title
-            )
+    if tracked_bots and len(tracked_bots) > 0:
+        status_msg = await channel.send(f"*⌛Extracting data of tracked Bots...*")
+        title = "**Tracked Bots**"
+        leaderboard_json_tracked = filter_json_tracked(leaderboard_json, tracked_bots)
+        if leaderboard_json_tracked and len(leaderboard_json_tracked) > 0:
+            if force_text:
+                await send_table_texts(
+                    channel, status_msg, leaderboard_json_tracked, 0, title
+                )
+            else:
+                await send_table_images(
+                    channel, status_msg, leaderboard_json_tracked, 0, title
+                )
 
 
 # MARK: post_lb_in_scheduled_channels()
