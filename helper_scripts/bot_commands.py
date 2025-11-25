@@ -197,6 +197,7 @@ def register_commands(
         )
         embed_color = 0xB1CCDB
 
+        # MARK: > list
         if action == "list":
             if not tracked_bots:
                 embed = discord.Embed(
@@ -219,7 +220,9 @@ def register_commands(
                 )
 
             await ctx.send(embed=embed)
+            return
 
+        # MARK: > add
         elif action == "add":
             if not arg:
                 await ctx.send(
@@ -232,82 +235,126 @@ def register_commands(
                 await ctx.send(leaderboard_json[0]["error"])
                 return
 
-            # Split by commas and strip whitespace
             bot_names = [name.strip() for name in arg.split(",") if name.strip()]
             added_bots = []
-            not_found = []
-
+            already_tracked = []
+            not_found_bots = []
+            limit_reached_bots = []
+            multi_index_needed = {}
             MAX_TRACKED_BOTS = 25
+            not_found_counter = 1
 
             for bot_name in bot_names:
                 if len(tracked_bots) >= MAX_TRACKED_BOTS:
-                    not_found.append(
-                        bot_name
-                        + f" (kann nicht hinzugefügt werden, Limit erreicht ({MAX_TRACKED_BOTS}))"
+                    limit_reached_bots.append(
+                        f"{not_found_counter}. ❌ {bot_name} (Limit erreicht)"
                     )
+                    not_found_counter += 1
                     continue
 
+                # Prüfen, ob Index angegeben wurde
+                parts = bot_name.rsplit(" ", 1)
+                base_name, index = (
+                    (parts[0], int(parts[1]) - 1)
+                    if len(parts) == 2 and parts[1].isdigit()
+                    else (bot_name, None)
+                )
+
+                # Matching: zuerst exakt, dann contains
                 matching_bots = [
-                    bot
-                    for bot in leaderboard_json
-                    if bot.get("Bot", "").lower() == bot_name.lower()
+                    b
+                    for b in leaderboard_json
+                    if b.get("Bot", "").lower() == base_name.lower()
                 ]
 
                 if not matching_bots:
-                    not_found.append(bot_name)
+                    # dann direkt not_found
+                    not_found_bots.append(f"{not_found_counter}. ❓ {bot_name}")
+                    not_found_counter += 1
                     continue
 
-                if len(matching_bots) > 1:
-                    not_found.append(bot_name + " (mehrdeutig)")
+                # wenn mehrere, dann in multi_index_needed speichern
+                if len(matching_bots) > 1 and index is None:
+                    multi_index_needed[bot_name] = matching_bots
                     continue
 
-                bot_info = matching_bots[0]
+                # Index anwenden, aber nur innerhalb dieser Liste
+                index = 0 if index is None else min(index, len(matching_bots) - 1)
+                bot_info = matching_bots[index]
 
-                # Check if bot already tracked (compare full dict)
                 bot_dict = {
                     "name": bot_info.get("Bot"),
                     "emoji": bot_info.get("Col1", ""),
                     "author": bot_info.get("Autor / Team", ""),
                 }
-                if any(b == bot_dict for b in tracked_bots):
-                    not_found.append(bot_name + " (bereits getrackt)")
+
+                if bot_dict in tracked_bots:
+                    already_tracked.append(bot_dict)
                     continue
 
                 tracked_bots.append(bot_dict)
-                added_bots.append(bot_info.get("Bot"))
+                added_bots.append(bot_dict)
 
-            # Save updated list
             set_tracked_bots(guild_id=guild_id, tracked=tracked_bots)
 
-            # Build embed for confirmation
-            embed = discord.Embed(
-                title="Folgende Bots wurden hinzugefügt",
-                color=0x00FF00,
-            )
+            embed = discord.Embed(title="Bots zum Tracken Hinzufügen", color=0x00FF00)
 
+            # Field 1: Successfully added bots
             if added_bots:
-                for bot_name in added_bots:
-                    # find the info from tracked_bots
-                    bot_info = next(
-                        (b for b in tracked_bots if b["name"] == bot_name), None
-                    )
-                    if bot_info:
-                        embed.add_field(
-                            name=f"{bot_info['emoji']} {bot_info['name']}",
-                            value=f"Autor: {bot_info['author']}",
-                            inline=False,
-                        )
-
-            if not_found:
+                lines = [
+                    f"{i+1}. {b['emoji']} {b['name']} (Autor: {b['author']})"
+                    for i, b in enumerate(added_bots)
+                ]
                 embed.add_field(
-                    name="⚠️ Nicht gefunden / mehrdeutig",
-                    value="\n".join(not_found),
+                    name="✅ **__Zugefügte Bots__**",
+                    value="\n".join(lines),
+                    inline=False,
+                )
+
+            # Field 2: Bots needing index selection
+            for bot_name, matches in multi_index_needed.items():
+                lines = [
+                    f"{i+1}. {b.get('Col1','')} {b.get('Bot','')} ({b.get('Autor / Team','')})"
+                    for i, b in enumerate(matches)
+                ]
+                embed.add_field(
+                    name=f"⚠️ **__Mehrere Bots gefunden für `{bot_name}`, bitte Index angeben__**",
+                    value="\n".join(lines),
+                    inline=False,
+                )
+
+            # Field 3: Already tracked bots
+            if already_tracked:
+                lines = [
+                    f"{i+1}. {b['emoji']} {b['name']} (Autor: {b['author']})"
+                    for i, b in enumerate(already_tracked)
+                ]
+                embed.add_field(
+                    name="⚠️ **__Bereits getrackte Bots__**",
+                    value="\n".join(lines),
+                    inline=False,
+                )
+
+            # Field 4: Not found
+            if not_found_bots:
+                embed.add_field(
+                    name="⚠️ **__Nicht gefunden__**",
+                    value="\n".join(not_found_bots),
+                    inline=False,
+                )
+
+            # Field 5: Limit reached
+            if limit_reached_bots:
+                embed.add_field(
+                    name=f"⚠️ **__Limit erreicht__** ({len(tracked_bots)}/{MAX_TRACKED_BOTS} Bots getrackt)",
+                    value="\n".join(limit_reached_bots),
                     inline=False,
                 )
 
             await ctx.send(embed=embed)
             return
 
+        # MARK: > remove
         elif action == "remove":
             if not arg:
                 await ctx.send(
@@ -339,7 +386,7 @@ def register_commands(
             set_tracked_bots(guild_id=guild_id, tracked=tracked_bots)
 
             # Build embed
-            embed = discord.Embed(title="Folgende Bots wurden entfernt", color=0xFF0000)
+            embed = discord.Embed(title="Bots zum Tracken entfernen", color=0xFF0000)
 
             if removed_bots:
                 for bot_info in removed_bots:
