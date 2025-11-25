@@ -20,24 +20,22 @@ from helper_scripts.helper_functions import (
     post_lb_in_scheduled_channels,
     send_leaderboard,
 )
-from helper_scripts.globals import BASE_DIR, DOTENV_PATH
+from helper_scripts.globals import DOTENV_PATH, LOCAL_DATA_PATH_DIR
 
 
-DATA_FILE = BASE_DIR / "bot_data.json"
-LOCAL_DATA = BASE_DIR / "local_data"
-IMAGES_DIR = BASE_DIR / "images"
-LANGUAGE_LOGOS_DIR = IMAGES_DIR / "languages"
+BOT_DATA_FILE = LOCAL_DATA_PATH_DIR / "bot_data.json"
 
-os.makedirs(LOCAL_DATA, exist_ok=True)
+os.makedirs(LOCAL_DATA_PATH_DIR, exist_ok=True)
 
 
 def main():
-    # all your current top-level code goes here:
-    # loading env, initializing bot, scheduler, etc.
+    # 1. Loading env
+    # 2. Initializing bot
+    # 3. Scheduler
 
     # Load saved channels on startup
-    if DATA_FILE.exists():
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
+    if BOT_DATA_FILE.exists():
+        with open(BOT_DATA_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             scheduled_channels = data.get("scheduled_channels", {})
             channels_to_post = set(int(ch_id) for ch_id in scheduled_channels.keys())
@@ -46,7 +44,7 @@ def main():
         channels_to_post = set()
 
     def save_channels():
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
+        with open(BOT_DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(
                 {"scheduled_channels": scheduled_channels},
                 f,
@@ -70,10 +68,11 @@ def main():
     intents = discord.Intents.default()
     intents.message_content = True
     hostname = socket.gethostname()
-    if hostname == "PC-Konsti" or hostname == "KS-uni-HP-ZBook":
-        bot = commands.Bot(command_prefix="?", intents=intents)
-    else:
-        bot = commands.Bot(command_prefix="!", intents=intents)
+    prefix = "?"
+    if hostname == "turtle-01":
+        prefix = "!"
+
+    bot = commands.Bot(command_prefix=prefix, intents=intents)
 
     # Scheduler mit CET
     scheduler = AsyncIOScheduler(timezone=pytz.timezone("Europe/Berlin"))

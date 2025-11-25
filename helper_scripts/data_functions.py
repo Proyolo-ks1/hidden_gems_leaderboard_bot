@@ -8,24 +8,24 @@ from typing import List, Dict
 # None
 
 # Own modules
-from helper_scripts.globals import BASE_DIR
+from helper_scripts.globals import LOCAL_DATA_PATH_DIR
 
 
-BOT_DATA_PATH = BASE_DIR / "bot_data.json"
+BOT_DATA_FILE = LOCAL_DATA_PATH_DIR / "bot_data.json"
 
 
 # MARK: Bot Data
 def load_bot_data() -> dict:
     """Load the entire bot_data.json file."""
-    if not BOT_DATA_PATH.exists():
+    if not BOT_DATA_FILE.exists():
         return {}
-    with open(BOT_DATA_PATH, "r", encoding="utf-8") as f:
+    with open(BOT_DATA_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def save_bot_data(data: dict):
     """Save a full dict back into bot_data.json."""
-    with open(BOT_DATA_PATH, "w", encoding="utf-8") as f:
+    with open(BOT_DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 

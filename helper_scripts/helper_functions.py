@@ -19,19 +19,17 @@ import requests
 # Own modules
 from helper_scripts.asset_access import language_logos, get_lang_icon, get_twemoji_image
 from helper_scripts.data_functions import load_bot_data
-from helper_scripts.globals import BASE_DIR
+from helper_scripts.globals import BASE_DIR, LOCAL_DATA_PATH_DIR
 
 
 FONTS_DIR = BASE_DIR / "fonts"
-LOCAL_DATA = BASE_DIR / "local_data"
-OUTPUT_DIR = LOCAL_DATA / "generated_tables"
-BOT_DATA_PATH = BASE_DIR / "bot_data.json"
+GENERATED_TABLES_DIR = LOCAL_DATA_PATH_DIR / "generated_tables"
 TEXT_FONT_PATH = FONTS_DIR / "DejaVuSans.ttf"
-HTML_FILE = LOCAL_DATA / "leaderboard.html"
-JSON_FILE = LOCAL_DATA / "leaderboard.json"
+HTML_FILE_PATH = LOCAL_DATA_PATH_DIR / "leaderboard.html"
+JSON_FILE_PATH = LOCAL_DATA_PATH_DIR / "leaderboard.json"
 
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(GENERATED_TABLES_DIR, exist_ok=True)
 
 
 # MARK: generate_images_from_json()
@@ -152,7 +150,7 @@ def generate_images_from_json(
 
             y += LINE_HEIGHT
 
-        file_path = os.path.join(OUTPUT_DIR, f"leaderboard_part_{i + 1}.png")
+        file_path = os.path.join(GENERATED_TABLES_DIR, f"leaderboard_part_{i + 1}.png")
         img.save(file_path)
         images.append(file_path)
 
@@ -179,13 +177,12 @@ async def send_table_images(
     else:
         image_paths = generate_images_from_json(leaderboard_json)
     # Build title message
+    header = ""
     if title:
-        header = title
-    else:
-        header = "**Aktuelles Leaderboard**"
+        header += title
 
-    if top_x:
-        header += f"\n(Top {top_x})"
+    if top_x and top_x > 0:
+        header += f"\n**(Top {top_x})**"
 
     await status_msg.edit(content=header)
     counter = 0
@@ -244,7 +241,7 @@ def extract_leaderboard_meta(html: str) -> Dict[str, Any]:
             # Split value into the actual seed and the rest (e.g., rounds)
             if " " in value:
                 seed_part, rest = value.split(" ", 1)
-                result["seed"] = f"{title}:`{seed_part}` {rest}"
+                result["seed"] = f"{title}: `{seed_part}` {rest}"
             else:
                 result["seed"] = f"{title}: `{value}`"
 
@@ -259,7 +256,7 @@ def parse_html_to_json(html: str) -> list[dict]:
         return []
 
     # Save raw HTML
-    with open(HTML_FILE, "w", encoding="utf-8") as f:
+    with open(HTML_FILE_PATH, "w", encoding="utf-8") as f:
         f.write(str(table))
 
     headers = [
@@ -326,7 +323,7 @@ def parse_html_to_json(html: str) -> list[dict]:
         leaderboard_json.append(entry)
 
     # Save JSON
-    with open(JSON_FILE, "w", encoding="utf-8") as f:
+    with open(JSON_FILE_PATH, "w", encoding="utf-8") as f:
         json.dump(leaderboard_json, f, ensure_ascii=False, indent=2)
 
     return leaderboard_json
@@ -401,8 +398,8 @@ def get_leaderboard_json() -> tuple[list[dict], dict[str, Any]]:
 
 
 # MARK: send_lines_chunked()
-async def send_lines_chunked(
-    channel, status_msg, leaderboard_json, top_x=-1, title: str | None = None
+async def send_table_texts(
+    channel, status_msg, leaderboard_json, top_x, title: str | None = None
 ):
     lines = json_to_text_table(leaderboard_json)
 
@@ -411,13 +408,12 @@ async def send_lines_chunked(
         lines = lines[: top_x + 2]  # +2 to include header + spacer
 
     # Build title message
+    header = ""
     if title:
-        header = title
-    else:
-        header = "**Aktuelles Leaderboard**"
+        header += title
 
-    if top_x:
-        header += f"\n(Top {top_x})"
+    if top_x and top_x > 0:
+        header += f"\n**(Top {top_x})**"
 
     await status_msg.edit(content=header)
 
@@ -459,45 +455,54 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
 
     leaderboard_json, leaderboard_meta = get_leaderboard_json()
 
+    # Leaderboard
+
     # Format the title using metadata (date, seed, stage)
     if leaderboard_meta:
-        # DATE
+        # Date
         date_str = (
             leaderboard_meta["date"].strftime("%d. %B %Y")
             if leaderboard_meta.get("date")
             else "Unbekanntes Datum"
         )
 
-        # STAGE
+        # Stage
         stage_str = (
             f"{leaderboard_meta['stage']}"
             if leaderboard_meta.get("stage") is not None
             else ""
         )
 
-        # SEED
-        seed_str = f"{leaderboard_meta['seed']}" if leaderboard_meta.get("seed") else ""
+        # Seed
+        seed_content = leaderboard_meta.get("seed", "")
+        seed_raw = seed_content.split("`")[1] if "`" in seed_content else seed_content
+        seed_str = (
+            f"{seed_content}\n-# Command:\n```ruby\nruby runner.rb --seed {seed_raw} --profile [/pfad/zu/deinem/bot]\n```"
+            if seed_content
+            else ""
+        )
 
-        title = f"## Leaderboard vom {date_str}\n-# {stage_str}\n-# {seed_str}"
+        title = f"# Leaderboard vom {date_str}\n-# {stage_str}\n-# {seed_str}"
     else:
-        title = "## Aktuelles Leaderboard"
+        title = "# Aktuelles Leaderboard"
 
     if force_text:
-        await send_lines_chunked(channel, status_msg, leaderboard_json, top_x, title)
+        await send_table_texts(channel, status_msg, leaderboard_json, top_x, title)
     else:
         await send_table_images(channel, status_msg, leaderboard_json, top_x, title)
 
     # Tracked bots
+    status_msg = await channel.send(f"*⌛Extracting data of tracked Bots...*")
+    title = "**Tracked Bots**"
     leaderboard_json_tracked = filter_json_tracked(leaderboard_json, tracked_bots)
     if leaderboard_json_tracked and len(leaderboard_json_tracked) > 0:
-        await channel.send("**Tracked Bots**")
         if force_text:
-            await send_lines_chunked(
-                channel, status_msg, leaderboard_json_tracked, title
+            await send_table_texts(
+                channel, status_msg, leaderboard_json_tracked, 0, title
             )
         else:
             await send_table_images(
-                channel, status_msg, leaderboard_json_tracked, title
+                channel, status_msg, leaderboard_json_tracked, 0, title
             )
 
 
@@ -529,7 +534,7 @@ async def post_lb_in_scheduled_channels(bot):
             await send_leaderboard(
                 channel,
                 tracked_bots=tracked_bots,
-                top_x=None,
+                top_x=0,
                 force_text=False,
                 as_thread=True,
             )
