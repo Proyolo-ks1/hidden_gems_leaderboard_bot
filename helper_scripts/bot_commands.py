@@ -364,11 +364,32 @@ def register_commands(
 
             indices = []
             not_found = []
-            # Parse comma-separated indices
+
+            # Parse comma-separated values and ranges
             for part in arg.split(","):
                 part = part.strip()
                 if not part:
                     continue
+
+                # --- Check for ranges: 5-8 or 13..15 ---
+                if "-" in part or ".." in part:
+                    splitter = "-" if "-" in part else ".."
+                    try:
+                        start_str, end_str = part.split(splitter)
+                        start = int(start_str.strip())
+                        end = int(end_str.strip())
+
+                        for n in range(start, end + 1):
+                            idx = n - 1
+                            if 0 <= idx < len(tracked_bots):
+                                indices.append(idx)
+                            else:
+                                not_found.append(str(n))
+                    except ValueError:
+                        not_found.append(part)
+                    continue
+
+                # --- Single number ---
                 try:
                     idx = int(part) - 1
                     if 0 <= idx < len(tracked_bots):
@@ -378,28 +399,37 @@ def register_commands(
                 except ValueError:
                     not_found.append(part)
 
+            # Remove duplicates from indices
+            indices = sorted(set(indices), reverse=True)
+
             removed_bots = []
-            # Remove in reverse order to avoid index shifting
-            for idx in sorted(indices, reverse=True):
-                removed_bots.append(tracked_bots.pop(idx))
+            removed_info = []  # store (original_index, bot_dict)
+            for idx in indices:
+                bot = tracked_bots.pop(idx)
+                removed_bots.append(bot)
+                removed_info.append((idx + 1, bot))  # save 1-based index
 
             set_tracked_bots(guild_id=guild_id, tracked=tracked_bots)
 
             # Build embed
             embed = discord.Embed(title="Bots zum Tracken entfernen", color=0xFF0000)
 
-            if removed_bots:
-                for bot_info in removed_bots:
+            if removed_info:
+                for idx, bot_info in removed_info:
                     embed.add_field(
-                        name=f"{bot_info['emoji']} {bot_info['name']}",
+                        name=f"{idx}. {bot_info['emoji']} {bot_info['name']}",
                         value=f"Autor: {bot_info['author']}",
                         inline=False,
                     )
 
+            # Remove duplicates + sort not found
             if not_found:
+                clean_nf = sorted(
+                    set(not_found), key=lambda x: int(x) if x.isdigit() else x
+                )
                 embed.add_field(
                     name="⚠️ Ungültige Indizes",
-                    value="\n".join(not_found),
+                    value="\n".join(clean_nf),
                     inline=False,
                 )
 
