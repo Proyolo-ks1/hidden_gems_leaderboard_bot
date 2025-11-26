@@ -8,7 +8,7 @@ from PIL import Image
 import os
 
 # Third-party imports
-from discord import PartialEmoji
+from discord import Embed, PartialEmoji
 
 # Own custom scripts
 from helper_scripts.globals import BASE_DIR
@@ -43,17 +43,17 @@ class EIcons(Enum):
 language_logos_partial_emojis = {
     "ts": parse_custom_emoji("<:TS:1435771634072948908>"),
     "rust": parse_custom_emoji("<:RUST:1437187917431832696>"),
-    "ruby": parse_custom_emoji("<:RUBY:1435771629417267341>"),
+    "ruby": parse_custom_emoji("<:RUBY:1443010353465262142>"),
     "python": parse_custom_emoji("<:PYTHON:1435771628473811067>"),
     "php": parse_custom_emoji("<:PHP:1435771627282632709>"),
     "perl": parse_custom_emoji("<:PERL:1435771626246377614>"),
-    "lua": parse_custom_emoji("<:LUA:1435771625294532720>"),
+    "lua": parse_custom_emoji("<:LUA:1443010335450599554>"),
     "julia": parse_custom_emoji("<:JULIA:1435771623738314804>"),
     "js": parse_custom_emoji("<:JS:1435771622203068437>"),
-    "java": parse_custom_emoji("<:JAVA:1435771620303175740>"),
+    "java": parse_custom_emoji("<:JAVA:1443010310008213555>"),
     "go": parse_custom_emoji("<:GO:1435771619187621938>"),
     "fsharp": parse_custom_emoji("<:FSHARP:1435771617975468092>"),
-    "dart": parse_custom_emoji("<:DART:1435771616746410075>"),
+    "dart": parse_custom_emoji("<:DART:1443010321974296699>"),
     "csharp": parse_custom_emoji("<:CSHARP:1435771611117654026>"),
     "cpp": parse_custom_emoji("<:CPP:1435771610211811490>"),
     "c": parse_custom_emoji("<:C:1435771608361996471>"),
@@ -65,17 +65,17 @@ language_logos_partial_emojis = {
 language_logos = {
     "ts": "<:TS:1435771634072948908>",
     "rust": "<:RUST:1437187917431832696>",
-    "ruby": "<:RUBY:1435771629417267341>",
+    "ruby": "<:RUBY:1443010353465262142>",
     "python": "<:PYTHON:1435771628473811067>",
     "php": "<:PHP:1435771627282632709>",
     "perl": "<:PERL:1435771626246377614>",
-    "lua": "<:LUA:1435771625294532720>",
+    "lua": "<:LUA:1443010335450599554>",
     "julia": "<:JULIA:1435771623738314804>",
     "js": "<:JS:1435771622203068437>",
-    "java": "<:JAVA:1435771620303175740>",
+    "java": "<:JAVA:1443010310008213555>",
     "go": "<:GO:1435771619187621938>",
     "fsharp": "<:FSHARP:1435771617975468092>",
-    "dart": "<:DART:1435771616746410075>",
+    "dart": "<:DART:1443010321974296699>",
     "csharp": "<:CSHARP:1435771611117654026>",
     "cpp": "<:CPP:1435771610211811490>",
     "c": "<:C:1435771608361996471>",
@@ -149,3 +149,16 @@ def get_twemoji_image(emoji: str, size: int = 32) -> Image.Image:
     if size != img.width:
         img = img.resize((size, size), Image.Resampling.LANCZOS)
     return img
+
+
+async def send_embed_all_emojis(ctx):
+    """
+    Returns a single string that contains all plain-string language emojis.
+    Useful for quickly verifying whether all emojis render correctly.
+    """
+    embed = Embed(title="🛠️ Test aller Emojis", color=0x00FF00)
+    for lang, emoji in language_logos.items():
+        # name = Sprache, value = Emoji selbst
+        embed.add_field(name=lang.capitalize(), value=emoji, inline=True)
+
+    await ctx.send(embed=embed)

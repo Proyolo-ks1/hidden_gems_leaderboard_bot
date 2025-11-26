@@ -3,6 +3,8 @@
 from discord.ext import commands
 from discord import TextChannel
 
+from helper_scripts.asset_access import send_embed_all_emojis
+
 class AdminCommands(commands.Cog):
     def __init__(self, bot, admins, channels_to_post, scheduled_channels, save_channels_func):
         self.bot = bot
@@ -52,6 +54,10 @@ class AdminCommands(commands.Cog):
                 return await ctx.send("🚫 Admins only.")
             msg = "\n".join([f"`{k}`: {v}" for k, v in self.scheduled_channels.items()])
             await ctx.send(f"📋 Channels:\n{msg}" if msg else "📭 Leer.")
+
+    @commands.command('emojitest' )
+    async def emoji_test_command(self, ctx):
+        await send_embed_all_emojis(ctx)
 
 async def setup(bot):
     # This setup is handled manually in registry.py due to custom init args

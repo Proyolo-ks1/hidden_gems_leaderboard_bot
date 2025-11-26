@@ -22,6 +22,7 @@ from helper_scripts.helper_functions import (
     send_leaderboard,
 )
 from helper_scripts.globals import DOTENV_PATH, LOCAL_DATA_PATH_DIR
+from commands.custom_help import CustomHelpCommand 
 
 # Setze die Umgebungsvariable, die requests anweist, diese CA-Zertifikate zu verwenden
 #
@@ -77,6 +78,9 @@ def main():
         prefix = "!"
 
     bot = commands.Bot(command_prefix=prefix, intents=intents)
+
+    # --- SET CUSTOM EMBED HELP COMMAND ---
+    bot.help_command = CustomHelpCommand() 
 
     # Scheduler mit CET
     scheduler = AsyncIOScheduler(timezone=pytz.timezone("Europe/Berlin"))

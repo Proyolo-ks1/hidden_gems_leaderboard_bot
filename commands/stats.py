@@ -10,7 +10,7 @@ class StatsCommand(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="stats", aliases=["st"])
+    @commands.command(name="stats", aliases=["st"], help="Zeigt Statistik-Plots an. !stats [score | gu | cf | fc | lang | city]")
     async def stats_command(self, ctx, plot_name: str = None):
         available = {
             "score": "score_hist.png", "gu": "gu_pct_hist.png",

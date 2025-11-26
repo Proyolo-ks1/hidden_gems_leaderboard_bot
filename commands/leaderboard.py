@@ -9,7 +9,7 @@ class LeaderboardCommand(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="leaderboard", aliases=["lb", "top"])
+    @commands.command(name="leaderboard", aliases=["lb", "top"], help="Zeigt das Leaderboard an. !top [number] [text] [no_tracked]")
     async def leaderboard_command(self, ctx, top_x: Optional[str] = None, mode: Optional[str] = None):
         if top_x == "help":
             return await ctx.send("Usage: !top [number] [text] [no_tracked]")

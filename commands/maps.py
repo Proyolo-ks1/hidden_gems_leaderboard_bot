@@ -42,7 +42,7 @@ class MapsCommand(commands.Cog):
         
         return df_result, folder
 
-    @commands.command(name='maps', aliases=['map', 'm'], help="Generiert eine Karte. !maps [png|html]")
+    @commands.command(name='map', aliases=['maps', 'm'], help="Generiert eine Karte. !maps [png | html]")
     @commands.cooldown(1, 30, commands.BucketType.user)
     async def maps_command(self, ctx: commands.Context, mode: str = 'png'):
         """
