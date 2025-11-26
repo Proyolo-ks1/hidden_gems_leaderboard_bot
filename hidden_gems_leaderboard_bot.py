@@ -4,7 +4,6 @@
 import os
 import json
 import socket
-from pathlib import Path
 
 # Third-party imports
 import discord

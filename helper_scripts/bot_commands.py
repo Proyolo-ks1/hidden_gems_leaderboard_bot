@@ -4,7 +4,6 @@
 from typing import Optional, List, Dict
 
 # Third-party imports
-import discord
 from discord.ext import commands
 from discord import TextChannel
 from discord import Embed
