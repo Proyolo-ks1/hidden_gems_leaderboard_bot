@@ -6,12 +6,8 @@ import json
 import socket
 from pathlib import Path
 
-
-
 # Third-party imports
-
 import certifi
-
 import discord
 from discord.ext import commands
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -20,19 +16,17 @@ import pytz
 from dotenv import load_dotenv
 
 # Own custom scripts / modules
-from helper_scripts.bot_commands import register_commands
+from helper_scripts.registry import register_commands  # <--- NEW: Imports the async registry
 from helper_scripts.helper_functions import (
     post_lb_in_scheduled_channels,
     send_leaderboard,
 )
 from helper_scripts.globals import DOTENV_PATH, LOCAL_DATA_PATH_DIR
 
-
-
 # Setze die Umgebungsvariable, die requests anweist, diese CA-Zertifikate zu verwenden
+#
 os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
 os.environ['SSL_CERT_FILE'] = certifi.where() 
-
 
 BOT_DATA_FILE = LOCAL_DATA_PATH_DIR / "bot_data.json"
 
@@ -64,7 +58,6 @@ def main():
             )
 
     # Load Environment Variables
-
     load_dotenv(dotenv_path=DOTENV_PATH)
     DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
     if DISCORD_BOT_TOKEN is None:
@@ -88,6 +81,21 @@ def main():
     # Scheduler mit CET
     scheduler = AsyncIOScheduler(timezone=pytz.timezone("Europe/Berlin"))
 
+    # ----------------- Async Setup Hook -----------------
+    # This is required because adding Cogs is now async
+    async def setup_hook():
+        await register_commands(
+            bot,
+            ADMINS,
+            channels_to_post,
+            scheduled_channels,
+            save_channels,
+            send_leaderboard,
+        )
+    
+    # Assign the hook to the bot instance
+    bot.setup_hook = setup_hook
+
     # ----------------- Bot Ready & Scheduler -----------------
     @bot.event
     async def on_ready():
@@ -108,15 +116,6 @@ def main():
             for job in scheduler.get_jobs():
                 next_run = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S %Z")
                 print(f"Scheduler bereits aktiv. Nächster Lauf: {next_run}")
-
-    register_commands(
-        bot,
-        ADMINS,
-        channels_to_post,
-        scheduled_channels,
-        save_channels,
-        send_leaderboard,
-    )
 
     bot.run(DISCORD_BOT_TOKEN)
 
