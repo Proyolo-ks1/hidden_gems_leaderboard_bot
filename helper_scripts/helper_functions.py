@@ -169,7 +169,7 @@ def fit_text_to_column(draw, text, font, max_width):
 
 # MARK: send_table_images()
 async def send_table_images(
-    channel, status_msg, leaderboard_json, top_x, title: str | None = None
+    channel, status_msg, leaderboard_json, top_x, as_thread, title: str | None = None
 ):
     await status_msg.edit(content="📊 Generating leaderboard images...")
 
@@ -186,14 +186,14 @@ async def send_table_images(
     thread: Optional[discord.Thread] = None
     thread_created = False
 
-    # Only use thread if more than 1 image
-    use_thread = len(image_paths) > 1
+    # Only use thread if as_thread=True and more than 1 image
+    use_thread = as_thread and len(image_paths) > 1
 
     # Determine thread title: first line of title
     thread_title = title.split("\n")[0] if title else "Rest der Leaderboards"
 
     for i, path in enumerate(image_paths):
-        # If more than 1 image, send all images into thread as well
+        # Send into thread if enabled
         if use_thread:
             if not thread_created:
                 thread = await status_msg.create_thread(name=thread_title)
@@ -202,7 +202,7 @@ async def send_table_images(
                 await thread.send(file=discord.File(path))
 
         # Always send first MAX_IMAGES_BEFORE_THREAD images in main channel
-        if i < MAX_IMAGES_BEFORE_THREAD:
+        if i < MAX_IMAGES_BEFORE_THREAD or not use_thread:
             await channel.send(file=discord.File(path))
 
 
@@ -406,9 +406,9 @@ def get_leaderboard_json() -> tuple[list[dict], dict[str, Any]]:
     return leaderboard_json, leaderboard_meta
 
 
-# MARK: send_lines_chunked()
+# MARK: send_table_texts()
 async def send_table_texts(
-    channel, status_msg, leaderboard_json, top_x, title: str | None = None
+    channel, status_msg, leaderboard_json, top_x, as_thread, title: str | None = None
 ):
     lines = json_to_text_table(leaderboard_json)
 
@@ -417,10 +417,7 @@ async def send_table_texts(
         lines = lines[: top_x + 2]  # +2 to include header + spacer
 
     # Build title message
-    header = ""
-    if title:
-        header += title
-
+    header = title or ""
     if top_x and top_x > 0:
         header += f"\n**(Top {top_x})**"
 
@@ -428,13 +425,34 @@ async def send_table_texts(
 
     MAX_LEN = 2000
     chunk = ""
+    messages_needed = (sum(len(line) + 1 for line in lines) // MAX_LEN) + 1
+    use_thread = as_thread and messages_needed > 1
+
+    thread: Optional[discord.Thread] = None
+    thread_created = False
+
     for line in lines:
         if len(chunk) + len(line) + 1 > MAX_LEN:
-            await channel.send(chunk)
+            # Send chunk
+            if use_thread:
+                if not thread_created:
+                    thread = await status_msg.create_thread(
+                        name=title.split("\n")[0] if title else "Leaderboard"
+                    )
+                    thread_created = True
+                if thread:
+                    await thread.send(chunk)
+            else:
+                await channel.send(chunk)
             chunk = ""
         chunk += line + "\n"
+
+    # Send remaining chunk
     if chunk:
-        await channel.send(chunk)
+        if use_thread and thread:
+            await thread.send(chunk)
+        else:
+            await channel.send(chunk)
 
 
 # MARK: filter_json_tracked()
@@ -457,10 +475,6 @@ def filter_json_tracked(
 # MARK: send_leaderboard()
 async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
     status_msg = await channel.send("*⌛Fetching leaderboards...*")
-
-    if as_thread:
-        # TODO: implement thread posting
-        pass
 
     leaderboard_json, leaderboard_meta = get_leaderboard_json()
 
@@ -496,9 +510,23 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
         title = "# Aktuelles Leaderboard"
 
     if force_text:
-        await send_table_texts(channel, status_msg, leaderboard_json, top_x, title)
+        await send_table_texts(
+            channel=channel,
+            status_msg=status_msg,
+            leaderboard_json=leaderboard_json,
+            top_x=top_x,
+            as_thread=True,
+            title=title,
+        )
     else:
-        await send_table_images(channel, status_msg, leaderboard_json, top_x, title)
+        await send_table_images(
+            channel=channel,
+            status_msg=status_msg,
+            leaderboard_json=leaderboard_json,
+            top_x=top_x,
+            as_thread=True,
+            title=title,
+        )
 
     # Tracked bots
     if tracked_bots and len(tracked_bots) > 0:
@@ -508,11 +536,21 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
         if leaderboard_json_tracked and len(leaderboard_json_tracked) > 0:
             if force_text:
                 await send_table_texts(
-                    channel, status_msg, leaderboard_json_tracked, 0, title
+                    channel=channel,
+                    status_msg=status_msg,
+                    leaderboard_json=leaderboard_json_tracked,
+                    top_x=0,
+                    as_thread=False,
+                    title=title,
                 )
             else:
                 await send_table_images(
-                    channel, status_msg, leaderboard_json_tracked, 0, title
+                    channel=channel,
+                    status_msg=status_msg,
+                    leaderboard_json=leaderboard_json_tracked,
+                    top_x=0,
+                    as_thread=False,
+                    title=title,
                 )
 
 

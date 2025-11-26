@@ -73,7 +73,7 @@ def register_commands(
             tracked_bots=tracked_bots,
             top_x=top_x_int,
             force_text=force_text,
-            as_thread=False,  # or True if you implement thread posting
+            as_thread=True,
         )
 
     # MARK: !schedule
