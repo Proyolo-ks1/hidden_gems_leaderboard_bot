@@ -4,6 +4,7 @@
 import os
 import json
 import socket
+from datetime import datetime, timezone
 
 # Third-party imports
 import discord
@@ -22,6 +23,7 @@ from helper_scripts.helper_functions import (
 from helper_scripts.globals import DOTENV_PATH, LOCAL_DATA_PATH_DIR
 
 
+DAILY_POST_TIME = "20:02:00"
 BOT_DATA_FILE = LOCAL_DATA_PATH_DIR / "bot_data.json"
 
 os.makedirs(LOCAL_DATA_PATH_DIR, exist_ok=True)
@@ -33,14 +35,21 @@ def main():
     # 3. Scheduler
 
     # Load saved channels on startup
+    scheduled_channels = {}
+    channels_to_post = set()
+
     if BOT_DATA_FILE.exists():
-        with open(BOT_DATA_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            scheduled_channels = data.get("scheduled_channels", {})
-            channels_to_post = set(int(ch_id) for ch_id in scheduled_channels.keys())
-    else:
-        scheduled_channels = {}
-        channels_to_post = set()
+        try:
+            with open(BOT_DATA_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                scheduled_channels = data.get("scheduled_channels", {})
+                channels_to_post = set(
+                    int(ch_id) for ch_id in scheduled_channels.keys()
+                )
+        except (json.JSONDecodeError, ValueError):
+            print(f"⚠️ Warning: {BOT_DATA_FILE} is empty or corrupted, starting fresh.")
+            scheduled_channels = {}
+            channels_to_post = set()
 
     def save_channels():
         with open(BOT_DATA_FILE, "w", encoding="utf-8") as f:
@@ -83,19 +92,37 @@ def main():
 
         # Scheduler starten
         if not scheduler.get_jobs():
+            h, m, s = map(int, DAILY_POST_TIME.split(":"))
+
             job = scheduler.add_job(
                 post_lb_in_scheduled_channels,
-                CronTrigger(hour=3, minute=00),
+                CronTrigger(hour=h, minute=m, second=s),
                 args=[bot],
             )
             scheduler.start()
 
-            next_run = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S %Z")
-            print(f"Scheduler gestartet! Nächster Post um: {next_run}")
+            next_run = job.next_run_time
+            now = datetime.now(timezone.utc)
+            delta = next_run - now
+            hours, remainder = divmod(int(delta.total_seconds()), 3600)
+            minutes, seconds = divmod(remainder, 60)
+
+            print(
+                f"Scheduler gestartet! Nächster Post um: {next_run.strftime('%Y-%m-%d %H:%M:%S %Z')} "
+                f"({hours}h {minutes}m {seconds}s von jetzt)"
+            )
         else:
             for job in scheduler.get_jobs():
-                next_run = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S %Z")
-                print(f"Scheduler bereits aktiv. Nächster Lauf: {next_run}")
+                next_run = job.next_run_time
+                now = datetime.now(timezone.utc)
+                delta = next_run - now
+                hours, remainder = divmod(int(delta.total_seconds()), 3600)
+                minutes, seconds = divmod(remainder, 60)
+
+                print(
+                    f"Scheduler bereits aktiv. Nächster Lauf: {next_run.strftime('%Y-%m-%d %H:%M:%S %Z')} "
+                    f"({hours}h {minutes}m {seconds}s von jetzt)"
+                )
 
     # ----------------- Command Logging -----------------
     @bot.event

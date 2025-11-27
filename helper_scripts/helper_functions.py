@@ -338,17 +338,19 @@ def parse_html_to_json(html: str) -> list[dict]:
     return leaderboard_json
 
 
+# MARK: fit()
+def fit(text: str, width: int = 24) -> str:
+    """Truncate if too long, pad with spaces if too short."""
+    if len(text) > width:
+        return text[: width - 3] + "..."
+    return text.ljust(width)
+
+
 # MARK: json_to_text_table()
 def json_to_text_table(leaderboard_json: list[dict]) -> list[str]:
     """Return the leaderboard as a list of formatted lines instead of a single string, with index column."""
     if not leaderboard_json:
         return ["Leaderboard konnte nicht geladen werden."]
-
-    def fit(text: str, width: int = 24) -> str:
-        """Truncate if too long, pad with spaces if too short."""
-        if len(text) > width:
-            return text[: width - 3] + "..."
-        return text.ljust(width)
 
     # Header row: add "Idx" before "Rang"
     header_row = (
@@ -408,7 +410,13 @@ def get_leaderboard_json() -> tuple[list[dict], dict[str, Any]]:
 
 # MARK: send_table_texts()
 async def send_table_texts(
-    channel, status_msg, leaderboard_json, top_x, as_thread, title: str | None = None
+    channel,
+    status_msg,
+    leaderboard_json,
+    top_x,
+    as_thread,
+    title: str | None = None,
+    short_table: bool = False,
 ):
     lines = json_to_text_table(leaderboard_json)
 
@@ -432,20 +440,32 @@ async def send_table_texts(
     thread_created = False
 
     for line in lines:
-        if len(chunk) + len(line) + 1 > MAX_LEN:
-            # Send chunk
-            if use_thread:
-                if not thread_created:
-                    thread = await status_msg.create_thread(
-                        name=title.split("\n")[0] if title else "Leaderboard"
-                    )
-                    thread_created = True
-                if thread:
-                    await thread.send(chunk)
+        line_to_add: str  # Typ klarstellen
+
+        if short_table:
+            parts = line.split("|")
+            if len(parts) >= 11:
+                # Definiere Breiten für die Short-Version
+                IDX_WIDTH = 3
+                RANK_WIDTH = 4
+                BOT_AUTHOR_WIDTH = 32
+                SCORE_WIDTH = 6
+                ORT_WIDTH = 16
+                LNG_WIDTH = 4
+
+                bot_author = fit(
+                    parts[3].strip() + " - " + parts[8].strip(), BOT_AUTHOR_WIDTH
+                )
+                line_to_add = (
+                    f"{fit(parts[0], IDX_WIDTH)}|{fit(parts[1], RANK_WIDTH)}|{parts[2]}|"
+                    f"{bot_author}|{fit(parts[4], SCORE_WIDTH)}|{fit(parts[9], ORT_WIDTH)}|{fit(parts[10], LNG_WIDTH)}"
+                )
             else:
-                await channel.send(chunk)
-            chunk = ""
-        chunk += line + "\n"
+                line_to_add = line  # fallback falls Format anders
+        else:
+            line_to_add = line
+
+        chunk += line_to_add + "\n"
 
     # Send remaining chunk
     if chunk:
@@ -515,7 +535,7 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
             status_msg=status_msg,
             leaderboard_json=leaderboard_json,
             top_x=top_x,
-            as_thread=True,
+            as_thread=as_thread,
             title=title,
         )
     else:
@@ -524,7 +544,7 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
             status_msg=status_msg,
             leaderboard_json=leaderboard_json,
             top_x=top_x,
-            as_thread=True,
+            as_thread=as_thread,
             title=title,
         )
 
@@ -540,7 +560,7 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
                     status_msg=status_msg,
                     leaderboard_json=leaderboard_json_tracked,
                     top_x=0,
-                    as_thread=False,
+                    as_thread=False,  # Tracked Bots nie als Thread
                     title=title,
                 )
             else:
@@ -549,18 +569,20 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
                     status_msg=status_msg,
                     leaderboard_json=leaderboard_json_tracked,
                     top_x=0,
-                    as_thread=False,
+                    as_thread=False,  # Tracked Bots nie als Thread
                     title=title,
                 )
 
 
 # MARK: post_lb_in_scheduled_channels()
 async def post_lb_in_scheduled_channels(bot):
+    print("🕒 Scheduler triggered! Starting automatic leaderboard posts...")
+
     data = load_bot_data()
     guilds = data.get("guild_data", {})
 
     if not guilds:
-        print("Keine Guild-Daten gefunden.")
+        print("⚠️ Keine Guild-Daten gefunden.")
         return
 
     # Loop through all guilds/DMs
@@ -569,20 +591,29 @@ async def post_lb_in_scheduled_channels(bot):
         tracked_bots = g_data.get("tracked_bots", [])
 
         if not scheduled_channels:
+            print(f"⚠️ Guild {guild_id} hat keine geplanten Channels, skipping.")
             continue
 
         for channel_id in scheduled_channels:
             channel = bot.get_channel(int(channel_id))
 
             if channel is None:
-                print(f"Channel {channel_id} nicht gefunden.")
+                print(f"❌ Channel {channel_id} nicht gefunden.")
                 continue
 
-            # DM or guild both fine (TextChannel, Thread, DMChannel)
-            await send_leaderboard(
-                channel,
-                tracked_bots=tracked_bots,
-                top_x=0,
-                force_text=False,
-                as_thread=True,
-            )
+            print(
+                f"📤 Sending leaderboard to channel {channel_id}..."
+            )  # <--- log each send
+            try:
+                await send_leaderboard(
+                    channel,
+                    tracked_bots=tracked_bots,
+                    top_x=0,
+                    force_text=False,
+                    as_thread=True,
+                )
+                print(f"✅ Successfully sent leaderboard to {channel_id}")
+            except Exception as e:
+                print(f"❌ Failed to send leaderboard to {channel_id}: {e}")
+
+    print("🕒 Scheduler run complete.")

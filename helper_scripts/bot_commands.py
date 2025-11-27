@@ -5,12 +5,16 @@ from typing import Optional, List, Dict
 
 # Third-party imports
 from discord.ext import commands
-from discord import TextChannel
-from discord import Embed
+from discord import TextChannel, DMChannel, Embed
 
 # Own modules
 from helper_scripts.helper_functions import get_leaderboard_json
-from helper_scripts.data_functions import get_tracked_bots, set_tracked_bots
+from helper_scripts.data_functions import (
+    get_tracked_bots,
+    load_bot_data,
+    save_bot_data,
+    set_tracked_bots,
+)
 from helper_scripts.asset_access import send_embed_all_emojis
 
 
@@ -81,24 +85,24 @@ def register_commands(
     async def schedule_command(ctx: commands.Context, action: str = ""):
         """Start, stop oder list scheduled leaderboard posts"""
         valid_actions = ["start", "stop", "list"]
+        data = load_bot_data()
+        channel_id = ctx.channel.id
+        channel = ctx.channel
+        guild = ctx.guild
 
-        # Wenn keine Aktion angegeben oder ungültig
         if not action or action.lower() not in valid_actions:
             await ctx.send(
-                f"## Nutzung von `{ctx.prefix}schedule`"
+                f"## Nutzung von {ctx.prefix}schedule"
                 f"\n-# (aliases: {ctx.prefix}s)"
                 "\n"
-                "\n- `start` → Scheduler für diesen Channel aktivieren"
-                "\n- `stop ` → Scheduler für diesen Channel deaktivieren"
-                "\n- `list ` → Zeigt alle registrierten Channels (Admins only)"
-                "\n-# ℹ️ Syntax: `<param>` = erforderlicher parameter, `[param]` = optionaler parameter"
+                "\n- start → Scheduler für diesen Channel aktivieren"
+                "\n- stop → Scheduler für diesen Channel deaktivieren"
+                "\n- list → Zeigt alle registrierten Channels (Admins only)"
+                "\n-# ℹ️ Syntax: <param> = erforderlicher parameter, [param] = optionaler parameter"
             )
             return
 
         action = action.lower()
-        channel_id = ctx.channel.id
-        channel = ctx.channel
-        guild = ctx.guild
 
         if guild is None or not isinstance(channel, TextChannel):
             await ctx.send(
@@ -106,33 +110,45 @@ def register_commands(
             )
             return
 
-        # START
+        guild_id_str = str(guild.id)
+        data.setdefault("guild_data", {}).setdefault(
+            guild_id_str, {"tracked_bots": [], "scheduled_channels": []}
+        )
+        guild_channels = data["guild_data"][guild_id_str]["scheduled_channels"]
+
+        # MARK: > start
         if action == "start":
-            if channel_id in channels_to_post:
-                await ctx.send("ℹ️ Dieser Channel bekommt das Leaderboard bereits.")
-            else:
-                channels_to_post.add(channel_id)
-                scheduled_channels[str(channel_id)] = f"{guild.name}#{channel.name}"
-                save_channels()
-                await ctx.send(
-                    "✅ Dieser Channel wird jetzt täglich um 03:00 CET das Leaderboard erhalten."
+            if channel_id in guild_channels:
+                embed = Embed(
+                    description="ℹ️ Dieser Channel bekommt das Leaderboard bereits.",
+                    color=0x57F287,
                 )
+            else:
+                guild_channels.append(channel_id)
+                save_bot_data(data)
+                embed = Embed(
+                    description="✅ Dieser Channel wird jetzt täglich um 03:00 CET das Leaderboard erhalten.",
+                    color=0x57F287,
+                )
+            await ctx.send(embed=embed)
 
-        # STOP
+        # MARK: > stop
         elif action == "stop":
-            if channel_id in channels_to_post:
-                channels_to_post.remove(channel_id)
-                scheduled_channels.pop(str(channel_id), None)
-                save_channels()
-                await ctx.send(
-                    "✅ Dieser Channel erhält das Leaderboard ab jetzt nicht mehr."
+            if channel_id in guild_channels:
+                guild_channels.remove(channel_id)
+                save_bot_data(data)
+                embed = Embed(
+                    description="✅ Dieser Channel erhält das Leaderboard ab jetzt nicht mehr.",
+                    color=0xED4245,
                 )
             else:
-                await ctx.send(
-                    "ℹ️ Dieser Channel war nicht für das Leaderboard registriert."
+                embed = Embed(
+                    description="ℹ️ Dieser Channel war nicht für das Leaderboard registriert.",
+                    color=0xED4245,
                 )
+            await ctx.send(embed=embed)
 
-        # LIST (Admins only)
+        # MARK: > list
         elif action == "list":
             if ctx.author.id not in ADMINS:
                 await ctx.send(
@@ -140,25 +156,31 @@ def register_commands(
                 )
                 return
 
-            if not scheduled_channels:
-                await ctx.send("📭 Es sind aktuell keine Channels registriert.")
-            else:
-                lines = []
-                for ch_id, full_name in scheduled_channels.items():
-                    if "#" in full_name:
-                        server, channel_name = full_name.split("#", 1)
+            all_channels = []
+            for g_id, g_data in data.get("guild_data", {}).items():
+                for ch_id in g_data.get("scheduled_channels", []):
+                    ch = bot.get_channel(ch_id)
+                    if isinstance(ch, TextChannel):
+                        all_channels.append(f"{ch.guild.name} → #{ch.name}")
+                    elif isinstance(ch, DMChannel):
+                        all_channels.append(f"DM with {ch.recipient}")
                     else:
-                        server, channel_name = full_name, "Unbekannt"
-                    lines.append(
-                        f"**Server:** `{server.strip()}` -> **Channel:** `#{channel_name.strip()}`"
-                    )
-                msg = "\n".join(lines)
-                await ctx.send(f"📋 **Aktuell registrierte Channels:**\n\n{msg}")
+                        all_channels.append(f"Unknown Channel → ID {ch_id}")
 
-        else:
-            await ctx.send(
-                "❌ Ungültiger Parameter. Nutze `start`, `stop` oder `list`."
-            )
+            if not all_channels:
+                embed = Embed(
+                    description="📭 Es sind aktuell keine Channels registriert.",
+                    color=0xB1CCDB,
+                )
+            else:
+                embed = Embed(
+                    title="📋 Aktuell registrierte Channels",
+                    color=0xB1CCDB,
+                )
+                for ch_desc in all_channels:
+                    embed.add_field(name="\u200b", value=ch_desc, inline=False)
+
+            await ctx.send(embed=embed)
 
     # MARK: !ping
     @bot.command(name="ping", aliases=["p"])
