@@ -23,7 +23,7 @@ from helper_scripts.helper_functions import (
 from helper_scripts.globals import DOTENV_PATH, LOCAL_DATA_PATH_DIR
 
 
-DAILY_POST_TIME = "20:02:00"
+DAILY_POST_TIME = "03:00:00"
 BOT_DATA_FILE = LOCAL_DATA_PATH_DIR / "bot_data.json"
 
 os.makedirs(LOCAL_DATA_PATH_DIR, exist_ok=True)
