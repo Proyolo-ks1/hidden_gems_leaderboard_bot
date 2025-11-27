@@ -58,6 +58,7 @@ language_logos_partial_emojis = {
     "cpp": parse_custom_emoji("<:CPP:1435771610211811490>"),
     "c": parse_custom_emoji("<:C:1435771608361996471>"),
     "powershell": parse_custom_emoji("<:powershell:1437200535663935618>"),
+    "pascal": parse_custom_emoji("<:pascallogo256blue:1443680788024524821>"),
     "noLanguage": parse_custom_emoji("<:noLanguage:1437201661645819966>"),
 }
 
@@ -80,6 +81,7 @@ language_logos = {
     "cpp": "<:CPP:1435771610211811490>",
     "c": "<:C:1435771608361996471>",
     "powershell": "<:powershell:1437200535663935618>",
+    "pascal": "<:pascal:1443680788024524821>",
     "noLanguage": "<:noLanguage:1437201661645819966>",
 }
 
@@ -110,6 +112,7 @@ LANGUAGE_ICONS = {
     "julia": "julia-logo-256.png",
     "lua": "lua-logo-256.png",
     "perl": "perl-logo-256.png",
+    "pascal": "pascal-logo-256-blue.png",
     "noLanguage": "no-logo-256.png",
 }
 
