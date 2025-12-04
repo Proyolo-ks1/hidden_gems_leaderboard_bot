@@ -234,11 +234,7 @@ def extract_leaderboard_meta(html: str) -> Dict[str, Any]:
 
         # --- DATE ---
         if title == "Datum":
-            try:
-                parsed = datetime.datetime.strptime(value, "%d. %B %Y").date()
-                result["date"] = parsed
-            except ValueError:
-                result["date"] = None
+            result["date"] = value
 
         # --- STAGE ---
         elif stage_regex.fullmatch(title):
@@ -503,11 +499,7 @@ async def send_leaderboard(channel, tracked_bots, top_x, force_text, as_thread):
     # Format the title using metadata (date, seed, stage)
     if leaderboard_meta:
         # Date
-        date_str = (
-            leaderboard_meta["date"].strftime("%d. %B %Y")
-            if leaderboard_meta.get("date")
-            else "Unbekanntes Datum"
-        )
+        date_str = leaderboard_meta.get("date", "Unbekannten Datum")
 
         # Stage
         stage_str = (
