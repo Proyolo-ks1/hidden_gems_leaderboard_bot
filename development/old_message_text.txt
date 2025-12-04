@@ -1,0 +1,8 @@
+# Leaderboard vom 04. Dezember 2025
+-# Stage #1 - Training Grounds
+-# Seed: `1cipqqh` (20 Runden)
+-# Command:
+```ruby
+ruby runner.rb --seed 1cipqqh --profile [/pfad/zu/deinem/bot]
+```
+**(Top 5)**

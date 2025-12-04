@@ -1,0 +1,8 @@
+https://discord.com/channels/1440117918095376539/1441916521864757415/1445957896000114739
+# Leaderboard vom 04. Dezember 2025
+-# Stage #1 - Training Grounds
+-# Seed: `c88jp` (20 Runden)
+-# Command:
+```ruby
+ruby runner.rb --seed c88jp --profile [/pfad/zu/deinem/bot]
+```
